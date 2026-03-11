@@ -24,7 +24,7 @@ export default function RoomPage({ params }: PageProps) {
   useEffect(() => {
     const storedUsername = sessionStorage.getItem("skribbl_username");
     if (!storedUsername) {
-      router.push("/");
+      router.push(`/?roomId=${roomId}`);
       return;
     }
     setUserName(storedUsername);

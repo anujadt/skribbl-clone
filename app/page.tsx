@@ -12,6 +12,14 @@ export default function Lobby() {
   useEffect(() => {
     const saved = sessionStorage.getItem("skribbl_username");
     if (saved) setUsername(saved);
+    
+    if (typeof window !== "undefined") {
+       const searchParams = new URLSearchParams(window.location.search);
+       const paramRoom = searchParams.get("roomId");
+       if (paramRoom) {
+          setRoomId(paramRoom);
+       }
+    }
   }, []);
 
   const handleJoin = (e: React.FormEvent) => {

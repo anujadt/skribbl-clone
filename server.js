@@ -76,13 +76,12 @@ app.prepare().then(() => {
     clearInterval(room.timer);
     
     room.gameState.status = "ROUND_REVEAL";
+    room.gameState.timeRemaining = 5;
     io.to(roomId).emit("system_message", `The word was: ${room.gameState.currentWord}`);
     broadcastRoomState(roomId);
     
-    // Wait afew seconds before passing turn
-    setTimeout(() => {
-      startNextTurn(roomId);
-    }, 5000);
+    // Wait 5 seconds before passing turn
+    room.timer = setInterval(() => tickTimer(roomId), 1000);
   };
   
   const tickTimer = (roomId) => {
@@ -93,13 +92,30 @@ app.prepare().then(() => {
     io.to(roomId).emit("timer_tick", room.gameState.timeRemaining);
     
     if (room.gameState.timeRemaining <= 0) {
-      endTurn(roomId);
+      if (room.gameState.status === "CHOOSING_WORD") {
+         clearInterval(room.timer);
+         const word = room.gameState.wordsToChoose[0];
+         room.gameState.currentWord = word;
+         room.gameState.wordsToChoose = [];
+         room.gameState.status = "DRAWING";
+         room.gameState.timeRemaining = room.settings.drawTimeSeconds;
+         io.to(roomId).emit("system_message", `✏️ Drawer took too long! Auto-selected a word.`);
+         broadcastRoomState(roomId);
+         room.timer = setInterval(() => tickTimer(roomId), 1000);
+      } else if (room.gameState.status === "DRAWING") {
+         endTurn(roomId);
+      } else if (room.gameState.status === "ROUND_REVEAL") {
+         clearInterval(room.timer);
+         startNextTurn(roomId);
+      }
     }
   };
 
   const startNextTurn = (roomId) => {
     const room = rooms[roomId];
     if (!room) return;
+    
+    clearInterval(room.timer);
     
     room.gameState.correctGuessersThisTurn = [];
     room.gameState.currentWord = null;
@@ -126,9 +142,12 @@ app.prepare().then(() => {
       room.gameState.currentDrawerName = nextDrawer.username;
       room.gameState.status = "CHOOSING_WORD";
       room.gameState.wordsToChoose = getRandomWords(3);
+      room.gameState.timeRemaining = 15; // 15 seconds to choose
       
       io.to(roomId).emit("system_message", `${nextDrawer.username} is choosing a word...`);
       broadcastRoomState(roomId);
+      
+      room.timer = setInterval(() => tickTimer(roomId), 1000);
     } else {
       room.gameState.status = "WAITING";
       room.gameState.currentDrawerName = null;
@@ -217,6 +236,8 @@ app.prepare().then(() => {
       const room = rooms[currentRoomId];
       const player = room?.players.find(p => p.socketId === socket.id);
       if (!room || !player || room.gameState.currentDrawerName !== player.username || room.gameState.status !== "CHOOSING_WORD") return;
+      
+      clearInterval(room.timer);
       
       room.gameState.currentWord = word;
       room.gameState.wordsToChoose = [];
