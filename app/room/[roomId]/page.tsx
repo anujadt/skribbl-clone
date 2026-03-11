@@ -20,7 +20,6 @@ export default function RoomPage({ params }: PageProps) {
   const router = useRouter();
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [socketId, setSocketId] = useState<string | null>(null);
-  const [wordsToChoose, setWordsToChoose] = useState<string[]>([]);
 
   useEffect(() => {
     const username = sessionStorage.getItem("skribbl_username");
@@ -42,14 +41,11 @@ export default function RoomPage({ params }: PageProps) {
     }
 
     const onRoomUpdate = (state: RoomState) => setRoomState(state);
-    const onChooseWord = (words: string[]) => setWordsToChoose(words);
 
     socket.on("room_state_update", onRoomUpdate);
-    socket.on("choose_word", onChooseWord);
 
     return () => {
       socket.off("room_state_update", onRoomUpdate);
-      socket.off("choose_word", onChooseWord);
       // Wait, socket.off("connect") could break future reconnections but it's fine for MVP
     };
   }, [roomId, router]);
@@ -67,7 +63,6 @@ export default function RoomPage({ params }: PageProps) {
 
   const handleSelectWord = (word: string) => {
      getSocket().emit("select_word", word);
-     setWordsToChoose([]);
   };
 
   return (
@@ -89,12 +84,12 @@ export default function RoomPage({ params }: PageProps) {
           </div>
 
           <div className="flex-1 h-[50vh] lg:h-full relative order-1 lg:order-2 rounded-[2rem] shadow-sm overflow-hidden border border-gray-100 bg-white">
-             {gameState.status === "CHOOSING_WORD" && isDrawer && wordsToChoose.length > 0 && (
+             {gameState.status === "CHOOSING_WORD" && isDrawer && gameState.wordsToChoose && gameState.wordsToChoose.length > 0 && (
                 <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center">
                   <div className="bg-white p-8 sm:p-12 rounded-[2.5rem] shadow-2xl text-center border border-gray-100 transform scale-100 animate-in fade-in zoom-in duration-200">
                      <h2 className="text-2xl sm:text-3xl font-black text-indigo-900 mb-8 drop-shadow-sm">Choose a word to draw!</h2>
                      <div className="flex flex-wrap gap-4 justify-center">
-                       {wordsToChoose.map(w => (
+                       {gameState.wordsToChoose.map(w => (
                           <button 
                             key={w} 
                             onClick={() => handleSelectWord(w)}

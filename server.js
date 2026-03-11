@@ -28,6 +28,7 @@ const createRoom = (roomId) => {
       currentWord: null,
       timeRemaining: 0,
       correctGuessersThisTurn: [],
+      wordsToChoose: [],
     },
     timer: null,
   };
@@ -124,15 +125,14 @@ app.prepare().then(() => {
       const nextDrawer = room.players[nextPlayerIndex];
       room.gameState.currentDrawerId = nextDrawer.socketId;
       room.gameState.status = "CHOOSING_WORD";
-      
-      const wordsToChoose = getRandomWords(3);
-      io.to(nextDrawer.socketId).emit("choose_word", wordsToChoose);
+      room.gameState.wordsToChoose = getRandomWords(3);
       
       io.to(roomId).emit("system_message", `${nextDrawer.username} is choosing a word...`);
       broadcastRoomState(roomId);
     } else {
       room.gameState.status = "WAITING";
       room.gameState.currentDrawerId = null;
+      room.gameState.wordsToChoose = [];
       io.to(roomId).emit("system_message", "Waiting for more players...");
       broadcastRoomState(roomId);
     }
@@ -218,6 +218,7 @@ app.prepare().then(() => {
       if (!room || room.gameState.currentDrawerId !== socket.id || room.gameState.status !== "CHOOSING_WORD") return;
       
       room.gameState.currentWord = word;
+      room.gameState.wordsToChoose = [];
       room.gameState.status = "DRAWING";
       room.gameState.timeRemaining = room.settings.drawTimeSeconds;
       

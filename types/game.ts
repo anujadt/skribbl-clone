@@ -12,6 +12,7 @@ export interface GameState {
   currentWord: string | null;
   timeRemaining: number;
   correctGuessersThisTurn: string[];
+  wordsToChoose: string[];
 }
 
 export interface RoomState {
