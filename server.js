@@ -224,34 +224,49 @@ app.prepare().then(() => {
       const player = room.players.find(p => p.socketId === socket.id);
       if (!player) return;
 
-      // Guessing logic
-      if (room.gameState.status === "DRAWING" && room.gameState.currentDrawerName !== player.username) {
-        if (room.gameState.currentWord && text.toLowerCase().trim() === room.gameState.currentWord.toLowerCase()) {
-           if (!room.gameState.correctGuessersThisTurn.includes(socket.id)) {
-              room.gameState.correctGuessersThisTurn.push(socket.id);
-              
-              // Calculate points
-              const pointsForGuesser = Math.max(10, Math.floor(room.gameState.timeRemaining * (100 / room.settings.drawTimeSeconds)));
-              player.score += pointsForGuesser;
-              
-              const drawer = room.players.find(p => p.username === room.gameState.currentDrawerName);
-              if (drawer) {
-                 drawer.score += 10;
-              }
-              
-              io.to(currentRoomId).emit("system_message", `🟩 ${player.username} guessed the word!`);
-              broadcastRoomState(currentRoomId);
-              
-              // If everyone guessed
-              if (room.gameState.correctGuessersThisTurn.length === room.players.length - 1) {
-                 endTurn(currentRoomId);
-              }
-              return; // Do not broadcast the correct guess to chat
-           } else {
-              // Already guessed
-              return; 
-           }
-        }
+      if (room.gameState.status === "DRAWING" && room.gameState.currentWord) {
+         const isExactGuess = text.toLowerCase().trim() === room.gameState.currentWord.toLowerCase();
+         const containsWord = text.toLowerCase().includes(room.gameState.currentWord.toLowerCase());
+         
+         const isDrawer = room.gameState.currentDrawerName === player.username;
+
+         if (isDrawer) {
+             if (containsWord) {
+                 socket.emit("system_message", "❌ You cannot type the word in chat!");
+                 return;
+             }
+         } else {
+             if (isExactGuess) {
+                 if (!room.gameState.correctGuessersThisTurn.includes(socket.id)) {
+                    room.gameState.correctGuessersThisTurn.push(socket.id);
+                    
+                    // Calculate points (max 400 per guesser based on time)
+                    const pointsForGuesser = Math.max(50, Math.floor((room.gameState.timeRemaining / room.settings.drawTimeSeconds) * 400));
+                    player.score += pointsForGuesser;
+                    
+                    const drawer = room.players.find(p => p.username === room.gameState.currentDrawerName);
+                    if (drawer) {
+                       // Drawer gets bonus based on how fast the guess was
+                       const drawerBonus = Math.max(10, Math.floor(pointsForGuesser / Math.max(1, room.players.length - 1)));
+                       drawer.score += drawerBonus;
+                    }
+                    
+                    io.to(currentRoomId).emit("system_message", `🟩 ${player.username} guessed the word!`);
+                    broadcastRoomState(currentRoomId);
+                    
+                    // If everyone guessed
+                    if (room.gameState.correctGuessersThisTurn.length === room.players.length - 1) {
+                       endTurn(currentRoomId);
+                    }
+                    return; // Do not broadcast the correct guess to chat
+                 } else {
+                    return; // Already guessed exactly, just drop it silently
+                 }
+             } else if (containsWord) {
+                 socket.emit("system_message", "❌ Please do not spoil the word in chat!");
+                 return;
+             }
+         }
       }
 
       // regular chat broadcast to room
