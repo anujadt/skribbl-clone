@@ -13,6 +13,7 @@ export interface GameState {
   timeRemaining: number;
   correctGuessersThisTurn: string[];
   wordsToChoose: string[];
+  playersTurnedThisRound: string[];
 }
 
 export interface RoomState {

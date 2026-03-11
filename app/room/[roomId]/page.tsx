@@ -59,6 +59,8 @@ export default function RoomPage({ params }: PageProps) {
 
   const { gameState, settings, players } = roomState;
   const isDrawer = gameState.currentDrawerName === username;
+  const player = players.find(p => p.username === username);
+  const isHost = player?.isHost || false;
 
   const handleSelectWord = (word: string) => {
      getSocket().emit("select_word", word);
@@ -136,6 +138,35 @@ export default function RoomPage({ params }: PageProps) {
                       </button>
                    </div>
                 </div>
+             )}
+
+             {gameState.status === "WAITING" && isHost && players.length >= 2 && (
+                 <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-[100] flex flex-col items-center justify-center p-4">
+                  <div className="bg-white p-8 sm:p-12 rounded-[2.5rem] shadow-2xl text-center border border-gray-100 transform scale-100 animate-in fade-in zoom-in duration-200 w-full max-w-md">
+                     <h2 className="text-2xl sm:text-3xl font-black text-indigo-900 mb-8 drop-shadow-sm">Ready to play?</h2>
+                     <button 
+                       onClick={() => getSocket().emit("start_game")}
+                       className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-2xl text-xl transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center justify-center gap-2"
+                     >
+                       Start Game
+                     </button>
+                  </div>
+                 </div>
+             )}
+             
+             {gameState.status === "WAITING" && (!isHost || players.length < 2) && (
+                 <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-[100] flex flex-col items-center justify-center p-4">
+                  <div className="bg-white p-8 sm:p-12 rounded-[2.5rem] shadow-2xl text-center border border-gray-100 transform scale-100 animate-in fade-in zoom-in duration-200">
+                     <h2 className="text-2xl sm:text-3xl font-black text-indigo-900 mb-4 drop-shadow-sm">Waiting for players...</h2>
+                     <p className="text-gray-500 text-lg">
+                       {players.length < 2 ? "Need at least 2 players to start." : "Waiting for the host to start the game."}
+                     </p>
+                     
+                     <div className="mt-8 flex justify-center">
+                       <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                     </div>
+                  </div>
+                 </div>
              )}
 
              <div className="absolute inset-0 z-0">

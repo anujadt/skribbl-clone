@@ -29,6 +29,7 @@ const createRoom = (roomId) => {
       timeRemaining: 0,
       correctGuessersThisTurn: [],
       wordsToChoose: [],
+      playersTurnedThisRound: [],
     },
     timer: null,
   };
@@ -121,13 +122,24 @@ app.prepare().then(() => {
     room.gameState.currentWord = null;
     io.to(roomId).emit("canvas_cleared");
 
-    // Logic to select next drawer
-    const currentPlayerIndex = room.players.findIndex(p => p.username === room.gameState.currentDrawerName);
-    let nextPlayerIndex = currentPlayerIndex + 1;
-    
-    if (nextPlayerIndex >= room.players.length) {
-      nextPlayerIndex = 0;
+    if (room.players.length < 2) {
+      room.gameState.status = "WAITING";
+      room.gameState.currentDrawerName = null;
+      room.gameState.wordsToChoose = [];
+      io.to(roomId).emit("system_message", "Waiting for more players...");
+      broadcastRoomState(roomId);
+      return;
+    }
+
+    // Clean up playersTurnedThisRound to remove people who left
+    room.gameState.playersTurnedThisRound = room.gameState.playersTurnedThisRound.filter(
+       name => room.players.some(p => p.username === name)
+    );
+
+    if (room.gameState.playersTurnedThisRound.length >= room.players.length) {
+      // Round is over, increment round
       room.gameState.currentRound += 1;
+      room.gameState.playersTurnedThisRound = [];
     }
     
     if (room.gameState.currentRound > room.settings.maxRounds) {
@@ -137,8 +149,11 @@ app.prepare().then(() => {
       return;
     }
     
-    if (room.players.length >= 2) {
-      const nextDrawer = room.players[nextPlayerIndex];
+    // Pick the next drawer who hasn't gone this round
+    const nextDrawer = room.players.find(p => !room.gameState.playersTurnedThisRound.includes(p.username));
+    
+    if (nextDrawer) {
+      room.gameState.playersTurnedThisRound.push(nextDrawer.username);
       room.gameState.currentDrawerName = nextDrawer.username;
       room.gameState.status = "CHOOSING_WORD";
       room.gameState.wordsToChoose = getRandomWords(3);
@@ -149,9 +164,9 @@ app.prepare().then(() => {
       
       room.timer = setInterval(() => tickTimer(roomId), 1000);
     } else {
+      // Fallback
       room.gameState.status = "WAITING";
       room.gameState.currentDrawerName = null;
-      room.gameState.wordsToChoose = [];
       io.to(roomId).emit("system_message", "Waiting for more players...");
       broadcastRoomState(roomId);
     }
@@ -181,11 +196,23 @@ app.prepare().then(() => {
       });
       
       io.to(roomId).emit("system_message", `${username} has joined the room!`);
+      broadcastRoomState(roomId);
+    });
+
+    socket.on("start_game", () => {
+      if (!currentRoomId) return;
+      const room = rooms[currentRoomId];
+      if (!room) return;
       
-      if (room.players.length >= 2 && room.gameState.status === "WAITING") {
-         startNextTurn(roomId);
-      } else {
-        broadcastRoomState(roomId);
+      const player = room.players.find(p => p.socketId === socket.id);
+      if (player && player.isHost && room.players.length >= 2 && room.gameState.status === "WAITING") {
+         room.gameState.currentRound = 1;
+         room.gameState.playersTurnedThisRound = [];
+         
+         // Reset scores
+         room.players.forEach(p => p.score = 0);
+         
+         startNextTurn(currentRoomId);
       }
     });
 
@@ -283,6 +310,12 @@ app.prepare().then(() => {
              clearInterval(room.timer);
              delete rooms[currentRoomId];
           } else {
+            // Re-assign host if the host left
+            if (player.isHost && room.players.length > 0) {
+              room.players[0].isHost = true;
+              io.to(currentRoomId).emit("system_message", `${room.players[0].username} is now the host.`);
+            }
+            
             // If the current drawer left
             if (room.gameState.currentDrawerName === player.username) {
                endTurn(currentRoomId);
