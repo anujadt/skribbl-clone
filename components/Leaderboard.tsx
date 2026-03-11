@@ -5,10 +5,10 @@ import { Brush, Trophy } from "lucide-react";
 
 interface LeaderboardProps {
   players: Player[];
-  currentDrawerId: string | null;
+  currentDrawerName: string | null;
 }
 
-export default function Leaderboard({ players, currentDrawerId }: LeaderboardProps) {
+export default function Leaderboard({ players, currentDrawerName }: LeaderboardProps) {
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
 
   return (
@@ -24,7 +24,7 @@ export default function Leaderboard({ players, currentDrawerId }: LeaderboardPro
       
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {sortedPlayers.map((p, index) => {
-          const isDrawer = p.socketId === currentDrawerId;
+          const isDrawer = p.username === currentDrawerName;
           const isFirst = index === 0 && p.score > 0;
           return (
             <div 

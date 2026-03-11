@@ -8,7 +8,7 @@ export interface Player {
 export interface GameState {
   status: "WAITING" | "CHOOSING_WORD" | "DRAWING" | "ROUND_REVEAL" | "GAME_OVER";
   currentRound: number;
-  currentDrawerId: string | null;
+  currentDrawerName: string | null;
   currentWord: string | null;
   timeRemaining: number;
   correctGuessersThisTurn: string[];

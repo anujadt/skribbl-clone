@@ -24,7 +24,7 @@ const createRoom = (roomId) => {
     gameState: {
       status: "WAITING", // WAITING, CHOOSING_WORD, DRAWING, ROUND_REVEAL, GAME_OVER
       currentRound: 1,
-      currentDrawerId: null,
+      currentDrawerName: null,
       currentWord: null,
       timeRemaining: 0,
       correctGuessersThisTurn: [],
@@ -106,7 +106,7 @@ app.prepare().then(() => {
     io.to(roomId).emit("canvas_cleared");
 
     // Logic to select next drawer
-    const currentPlayerIndex = room.players.findIndex(p => p.socketId === room.gameState.currentDrawerId);
+    const currentPlayerIndex = room.players.findIndex(p => p.username === room.gameState.currentDrawerName);
     let nextPlayerIndex = currentPlayerIndex + 1;
     
     if (nextPlayerIndex >= room.players.length) {
@@ -123,7 +123,7 @@ app.prepare().then(() => {
     
     if (room.players.length >= 2) {
       const nextDrawer = room.players[nextPlayerIndex];
-      room.gameState.currentDrawerId = nextDrawer.socketId;
+      room.gameState.currentDrawerName = nextDrawer.username;
       room.gameState.status = "CHOOSING_WORD";
       room.gameState.wordsToChoose = getRandomWords(3);
       
@@ -131,7 +131,7 @@ app.prepare().then(() => {
       broadcastRoomState(roomId);
     } else {
       room.gameState.status = "WAITING";
-      room.gameState.currentDrawerId = null;
+      room.gameState.currentDrawerName = null;
       room.gameState.wordsToChoose = [];
       io.to(roomId).emit("system_message", "Waiting for more players...");
       broadcastRoomState(roomId);
@@ -179,7 +179,7 @@ app.prepare().then(() => {
       if (!player) return;
 
       // Guessing logic
-      if (room.gameState.status === "DRAWING" && room.gameState.currentDrawerId !== socket.id) {
+      if (room.gameState.status === "DRAWING" && room.gameState.currentDrawerName !== player.username) {
         if (room.gameState.currentWord && text.toLowerCase().trim() === room.gameState.currentWord.toLowerCase()) {
            if (!room.gameState.correctGuessersThisTurn.includes(socket.id)) {
               room.gameState.correctGuessersThisTurn.push(socket.id);
@@ -188,7 +188,7 @@ app.prepare().then(() => {
               const pointsForGuesser = Math.max(10, Math.floor(room.gameState.timeRemaining * (100 / room.settings.drawTimeSeconds)));
               player.score += pointsForGuesser;
               
-              const drawer = room.players.find(p => p.socketId === room.gameState.currentDrawerId);
+              const drawer = room.players.find(p => p.username === room.gameState.currentDrawerName);
               if (drawer) {
                  drawer.score += 10;
               }
@@ -215,7 +215,8 @@ app.prepare().then(() => {
     socket.on("select_word", (word) => {
       if (!currentRoomId) return;
       const room = rooms[currentRoomId];
-      if (!room || room.gameState.currentDrawerId !== socket.id || room.gameState.status !== "CHOOSING_WORD") return;
+      const player = room?.players.find(p => p.socketId === socket.id);
+      if (!room || !player || room.gameState.currentDrawerName !== player.username || room.gameState.status !== "CHOOSING_WORD") return;
       
       room.gameState.currentWord = word;
       room.gameState.wordsToChoose = [];
@@ -231,8 +232,9 @@ app.prepare().then(() => {
     socket.on("draw_stroke", (strokeData) => {
       if (!currentRoomId) return;
       const room = rooms[currentRoomId];
+      const player = room?.players.find(p => p.socketId === socket.id);
       // Only drawer can draw
-      if (room && room.gameState.currentDrawerId === socket.id && room.gameState.status === "DRAWING") {
+      if (room && player && room.gameState.currentDrawerName === player.username && room.gameState.status === "DRAWING") {
         socket.to(currentRoomId).emit("receive_stroke", strokeData);
       }
     });
@@ -240,7 +242,8 @@ app.prepare().then(() => {
     socket.on("clear_canvas", () => {
       if (!currentRoomId) return;
       const room = rooms[currentRoomId];
-      if (room && room.gameState.currentDrawerId === socket.id) {
+      const player = room?.players.find(p => p.socketId === socket.id);
+      if (room && player && room.gameState.currentDrawerName === player.username) {
         io.to(currentRoomId).emit("canvas_cleared");
       }
     });
@@ -260,7 +263,7 @@ app.prepare().then(() => {
              delete rooms[currentRoomId];
           } else {
             // If the current drawer left
-            if (room.gameState.currentDrawerId === socket.id) {
+            if (room.gameState.currentDrawerName === player.username) {
                endTurn(currentRoomId);
             } else {
                broadcastRoomState(currentRoomId);
