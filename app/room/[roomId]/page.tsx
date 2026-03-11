@@ -40,11 +40,26 @@ export default function RoomPage({ params }: PageProps) {
     }
 
     const onRoomUpdate = (state: RoomState) => setRoomState(state);
+    
+    const onTimerTick = (timeRemaining: number) => {
+      setRoomState((prevState) => {
+        if (!prevState) return prevState;
+        return {
+          ...prevState,
+          gameState: {
+            ...prevState.gameState,
+            timeRemaining
+          }
+        };
+      });
+    };
 
     socket.on("room_state_update", onRoomUpdate);
+    socket.on("timer_tick", onTimerTick);
 
     return () => {
       socket.off("room_state_update", onRoomUpdate);
+      socket.off("timer_tick", onTimerTick);
       // Wait, socket.off("connect") could break future reconnections but it's fine for MVP
     };
   }, [roomId, router]);
